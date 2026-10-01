@@ -29,4 +29,13 @@ CREATE TABLE IF NOT EXISTS producto_ingredientes (
     FOREIGN KEY(producto_id) REFERENCES productos(id) ON DELETE CASCADE,
     FOREIGN KEY(materia_prima_id) REFERENCES materias_primas(id) ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS costos_generales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL CHECK(length(trim(nombre)) > 0),
+    categoria TEXT NOT NULL CHECK(length(trim(categoria)) > 0),
+    monto REAL NOT NULL CHECK(monto > 0),
+    periodo TEXT NOT NULL CHECK(length(trim(periodo)) > 0),
+    fecha_actualizacion TEXT NOT NULL,
+    activo INTEGER NOT NULL DEFAULT 1 CHECK(activo IN (0, 1))
+);
 """

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -11,11 +12,16 @@ from utils.helpers import now, unit_factor
 class Database:
     def __init__(self, path: str | Path): self.path = Path(path)
 
+    @contextmanager
     def _connect(self):
         con = sqlite3.connect(self.path)
         con.row_factory = sqlite3.Row
         con.execute("PRAGMA foreign_keys = ON")
-        return con
+        try:
+            with con:
+                yield con
+        finally:
+            con.close()
 
     def initialize(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -82,3 +88,20 @@ class Database:
                     con.execute("DELETE FROM producto_ingredientes WHERE producto_id=?",(product_id,))
         return product_id
     def delete_product(self, product_id): self.execute("DELETE FROM productos WHERE id=?",(product_id,))
+
+    def list_general_costs(self, search="", include_inactive=True):
+        active_clause = "" if include_inactive else "AND activo=1"
+        return self.query(f"SELECT * FROM costos_generales WHERE nombre LIKE ? OR categoria LIKE ? {active_clause} ORDER BY activo DESC, nombre", (f"%{search}%", f"%{search}%"))
+
+    def save_general_cost(self, values, cost_id=None):
+        params = (values["nombre"], values["categoria"], values["monto"], values["periodo"], now())
+        if cost_id:
+            self.execute("UPDATE costos_generales SET nombre=?,categoria=?,monto=?,periodo=?,fecha_actualizacion=? WHERE id=?", params + (cost_id,))
+            return cost_id
+        return self.execute("INSERT INTO costos_generales (nombre,categoria,monto,periodo,fecha_actualizacion,activo) VALUES (?,?,?,?,?,1)", params)
+
+    def set_general_cost_active(self, cost_id, active):
+        self.execute("UPDATE costos_generales SET activo=? WHERE id=?", (1 if active else 0, cost_id))
+
+    def delete_general_cost(self, cost_id):
+        self.execute("DELETE FROM costos_generales WHERE id=?", (cost_id,))

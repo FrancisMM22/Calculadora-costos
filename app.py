@@ -4,6 +4,7 @@ import flet as ft
 
 from components.sidebar import sidebar
 from database.database import Database
+from views.costos_generales import costos_generales_view
 from views.home import home_view
 from views.materias_primas import materias_primas_view
 from views.productos import productos_view
@@ -31,8 +32,8 @@ def main(page: ft.Page):
             content.content = materias_primas_view(page, db, render, quick)
         elif index == 2:
             content.content = productos_view(page, db, render, quick)
-        else:
-            content.content = ft.Column([ft.Text("Configuración", size=28, weight=ft.FontWeight.BOLD), ft.Text("Esta sección estará disponible en una próxima versión.")])
+        elif index == 3:
+            content.content = costos_generales_view(page, db, render, quick)
         rail.selected_index = index
         page.update()
 
