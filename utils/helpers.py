@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 UNITS = [
+    "miligramos",
     "gramos",
     "kilogramos",
     "mililitros",
@@ -11,6 +12,7 @@ UNITS = [
 ]
 
 UNIT_LABELS = {
+    "miligramos": "mg",
     "gramos": "g",
     "kilogramos": "kg",
     "mililitros": "ml",
@@ -50,6 +52,7 @@ PRODUCT_CATEGORIES = [
 ]
 
 UNIT_INFO = {
+    "miligramos": ("peso", 0.001, "gramo"),
     "gramos": ("peso", 1.0, "gramo"),
     "kilogramos": ("peso", 1000.0, "gramo"),
     "mililitros": ("volumen", 1.0, "mililitro"),

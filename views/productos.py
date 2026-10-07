@@ -5,7 +5,6 @@ from components.tables import action_buttons, simple_table
 from services.calculadora import ingredient_cost, product_cost
 from utils.helpers import (
     PRODUCT_CATEGORIES,
-    UNIT_LABELS,
     compatible_units,
     money,
     to_number,
@@ -222,6 +221,20 @@ def productos_view(page, db, refresh, open_new=False):
             original = (
                 ingredients[edit_index] if edit_index is not None else None
             )
+            original_material = next(
+                (
+                    item
+                    for item in materials
+                    if original
+                    and str(item["id"]) == str(original["materia_prima_id"])
+                ),
+                None,
+            )
+            initial_units = (
+                compatible_units(original_material["unidad_compra"])
+                if original_material
+                else []
+            )
 
             selected = ft.Dropdown(
                 label="Materia prima *",
@@ -242,12 +255,24 @@ def productos_view(page, db, refresh, open_new=False):
 
             unit = ft.Dropdown(
                 label="Unidad *",
-                value=original.get("unidad") if original else None,
-                options=[],
+                value=(
+                    original["unidad"]
+                    if original and original.get("unidad") in initial_units
+                    else initial_units[0] if initial_units else None
+                ),
+                options=[
+                    ft.dropdown.Option(
+                        key=choice,
+                        text=choice,
+                    )
+                    for choice in initial_units
+                ],
                 width=180,
-                disabled=True,
-                hint_text="Elegí una materia prima",
+                disabled=False,
+                hint_text=None if initial_units else "Elegí una materia prima",
             )
+            unit_host = ft.Container(content=unit, width=180)
+            unit_diagnostic = ft.Text(size=11, color=ft.Colors.BLUE_GREY_600)
 
             ingredient_error = ft.Text("", color=ft.Colors.RED_600)
 
@@ -261,7 +286,8 @@ def productos_view(page, db, refresh, open_new=False):
                 content=ft.Column(
                     [
                         selected,
-                        ft.Row([quantity, unit]),
+                        ft.Row([quantity, unit_host]),
+                        unit_diagnostic,
                         ingredient_error,
                     ],
                     tight=True,
@@ -278,37 +304,90 @@ def productos_view(page, db, refresh, open_new=False):
                     None,
                 )
 
-            def set_units(e=None):
+            def update_unit_diagnostic(event_status="Esperando selección"):
                 material = selected_material()
-                # Verifica que exista el material y la clave unidad_compra
+                purchase_unit = (
+                    material.get("unidad_compra") if material else None
+                )
+                option_labels = [
+                    option.text or option.key
+                    for option in unit.options
+                ]
+                in_current_host = unit_host.content is unit
+                unit_diagnostic.value = (
+                    f"Materia prima: {material['nombre'] if material else 'sin seleccionar'}"
+                    f" | Compra: {purchase_unit or '—'}"
+                    f" | Opciones: {', '.join(option_labels) or '—'}"
+                    f" | Seleccionada: {unit.value or '—'}"
+                    f" | Habilitado: {'sí' if not unit.disabled else 'no'}"
+                    f" | Visible: {'sí' if unit.visible else 'no'}"
+                    f" | Opacidad: {unit.opacity:g}"
+                    f" | Ancho: {unit.width}"
+                    f" | Control actual en contenedor: {'sí' if in_current_host else 'no'}"
+                    f" | {event_status}"
+                )
+
+            def unit_received_focus(e):
+                update_unit_diagnostic(
+                    "El selector recibió foco/clic"
+                    if e.control is unit
+                    else "El evento llegó a un control anterior"
+                )
+                page.update(unit_diagnostic)
+
+            def unit_changed(e):
+                update_unit_diagnostic(
+                    "La selección de unidad cambió"
+                    if e.control is unit
+                    else "El evento llegó a un control anterior"
+                )
+                page.update(unit_diagnostic)
+
+            unit.on_focus = unit_received_focus
+            unit.on_select = unit_changed
+            update_unit_diagnostic()
+
+            def set_units(e=None):
+                nonlocal unit
+                material = selected_material()
                 unidad_compra = material.get("unidad_compra") if material else None
 
                 if material and unidad_compra:
                     choices = compatible_units(unidad_compra)
+                    selected_unit = (
+                        unit.value if unit.value in choices else choices[0]
+                    )
+                    hint_text = None
+                else:
+                    choices = []
+                    selected_unit = None
+                    hint_text = "Elegí una materia prima"
 
-                    unit.options = [
+                # Dropdown.options no se marca como modificada al reasignarla
+                # en Flet 0.86.1. Reemplazar el control fuerza a Flet a enviar
+                # su configuración completa al cliente, incluso en el diálogo
+                # de ingrediente anidado.
+                unit = ft.Dropdown(
+                    label="Unidad *",
+                    value=selected_unit,
+                    options=[
                         ft.dropdown.Option(
                             key=choice,
-                            text=UNIT_LABELS.get(choice, choice),
+                            text=choice,
                         )
                         for choice in choices
-                    ]
+                    ],
+                    width=180,
+                    disabled=False,
+                    hint_text=hint_text,
+                )
+                unit.on_focus = unit_received_focus
+                unit.on_select = unit_changed
+                unit_host.content = unit
+                update_unit_diagnostic()
+                page.update(unit_host, unit_diagnostic)
 
-                    unit.disabled = False
-
-                    if unit.value not in choices:
-                        unit.value = choices[0] if choices else None
-
-                    unit.hint_text = None
-                else:
-                    unit.options = []
-                    unit.value = None
-                    unit.disabled = True
-                    unit.hint_text = "Elegí una materia prima"
-
-                page.update()
-
-            selected.on_change = set_units
+            selected.on_select = set_units
 
             def save_ingredient(e):
                 try:
@@ -376,10 +455,6 @@ def productos_view(page, db, refresh, open_new=False):
             ]
 
             show_dialog(page, ingredient_dialog)
-            # Inicializa las opciones cuando el dropdown ya está montado.
-            # Antes de abrir el diálogo page.update() no podía enviar de forma
-            # fiable el cambio de disabled/options al cliente.
-            set_units()
 
         def save(e):
             if not name.value.strip():
