@@ -1,6 +1,6 @@
 import flet as ft
 
-from components.dialogs import close_dialog, show_dialog
+from components.dialogs import close_dialog, confirm, show_dialog
 from components.tables import simple_table
 from utils.helpers import money, to_number
 
@@ -44,6 +44,7 @@ def costos_generales_view(page, db, refresh, open_new=False):
                 ft.DataCell(ft.Row([
                     ft.IconButton(ft.Icons.EDIT_OUTLINED, tooltip="Editar", disabled=not is_active, on_click=lambda e, cost=item: form(cost)),
                     toggle,
+                    ft.IconButton(ft.Icons.DELETE_OUTLINE, tooltip="Eliminar", icon_color=ft.Colors.RED_400, on_click=lambda e, cost=item: remove(cost)),
                 ], spacing=0)),
             ]))
         table = simple_table(["Nombre", "Categoría", "Monto", "Período / referencia", "Actualizado", "Estado", ""], rows)
@@ -55,6 +56,14 @@ def costos_generales_view(page, db, refresh, open_new=False):
     def set_active(item):
         db.set_general_cost_active(item["id"], not bool(item["activo"]))
         rebuild()
+
+    def remove(item):
+        confirm(
+            page,
+            "Eliminar costo general",
+            f"¿Querés eliminar '{item['nombre']}'?",
+            lambda: (db.delete_general_cost(item["id"]), rebuild()),
+        )
 
     def form(item=None):
         current = item["categoria"] if item else None
