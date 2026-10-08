@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import math
 
 UNITS = [
     "miligramos",
@@ -84,7 +85,10 @@ def to_number(value: object) -> float:
     ):
         text = text.replace(".", "")
 
-    return float(text)
+    number = float(text)
+    if not math.isfinite(number):
+        raise ValueError("number must be finite")
+    return number
 
 
 def unit_factor(unit: str) -> float:

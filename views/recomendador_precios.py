@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import flet as ft
+import math
 
 from components.tables import simple_table
 from components.branding import CHEESE_GOLD, PIZZA_RED, WHITE, page_heading, soft_shadow
@@ -32,7 +33,7 @@ def recomendador_precios_view(page: ft.Page, db) -> ft.Control:
             valores_previos = {product_id: field.value for product_id, field in precios.items()}
             precios.clear()
             if not analisis:
-                dashboard.controls = [ft.Container(ft.Text("Todavía no hay productos para analizar. Creá productos y agregales ingredientes para obtener recomendaciones."), bgcolor=ft.Colors.WHITE, padding=24, border_radius=10)]
+                dashboard.controls = [ft.Container(ft.Text("No hay productos registrados. Creá productos y agregales ingredientes para ver costos y recomendaciones."), bgcolor=ft.Colors.WHITE, padding=24, border_radius=12, shadow=soft_shadow())]
                 estado_error.value = ""
                 page.update()
                 return
@@ -61,8 +62,14 @@ def recomendador_precios_view(page: ft.Page, db) -> ft.Control:
                 page.update()
 
             def mostrar(items):
-                rentables = [i for i in items if i["precio_actual"] is not None]
-                mejor = max(rentables, key=lambda x: x["ganancia_actual"]) if rentables else max(items, key=lambda x: x["ganancia_estimada"])
+                mejor = max(
+                    items,
+                    key=lambda item: (
+                        item["ganancia_actual"]
+                        if item["precio_actual"] is not None
+                        else item["ganancia_estimada"]
+                    ),
+                )
                 caro = max(items, key=lambda x: x["costo_total"])
                 promedio = sum((i["margen_actual"] if i["margen_actual"] is not None else i["margen_neto"]) for i in items) / len(items)
                 cards = ft.Row([
@@ -72,13 +79,21 @@ def recomendador_precios_view(page: ft.Page, db) -> ft.Control:
                 ], spacing=12)
 
                 # Barras de comparación construidas con controles Flet nativos.
-                maximo = max([i["precio_recomendado"] for i in items] + [i["costo_total"] for i in items] + [i["precio_actual"] or 0 for i in items] + [1])
+                # Última defensa de los datos del gráfico: solo valores finitos.
+                def chart_value(value):
+                    try:
+                        number = float(value)
+                    except (TypeError, ValueError):
+                        return 0.0
+                    return number if math.isfinite(number) and number > 0 else 0.0
+
+                maximo = max([chart_value(i["precio_recomendado"]) for i in items] + [chart_value(i["costo_total"]) for i in items] + [chart_value(i["precio_actual"]) for i in items] + [1.0])
                 barras = []
                 for i in items[:12]:
-                    series = [("Costo total", i["costo_total"], "#AEB8C2"),
-                              ("Recomendado", i["precio_recomendado"], PIZZA_RED)]
+                    series = [("Costo total", chart_value(i["costo_total"]), "#AEB8C2"),
+                              ("Recomendado", chart_value(i["precio_recomendado"]), PIZZA_RED)]
                     if i["precio_actual"] is not None:
-                        series.append(("Actual", i["precio_actual"], CHEESE_GOLD))
+                        series.append(("Actual", chart_value(i["precio_actual"]), CHEESE_GOLD))
                     bars = ft.Column([ft.Row([ft.Text(label, width=92, size=11), ft.Container(width=max(4, 300 * val / maximo), height=15, bgcolor=color, border_radius=4, expand=False), ft.Text(money(val), size=11)]) for label, val, color in series], spacing=4)
                     barras.append(ft.Row([ft.Text(i["nombre"], width=170, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS), bars], vertical_alignment=ft.CrossAxisAlignment.CENTER))
                 grafico_barras = ft.Container(ft.Column([ft.Text("Costo total vs. precio recomendado y actual", size=17, weight=ft.FontWeight.BOLD), *barras], spacing=9), bgcolor=WHITE, padding=18, border_radius=12, shadow=soft_shadow())
@@ -96,12 +111,13 @@ def recomendador_precios_view(page: ft.Page, db) -> ft.Control:
                     margin_value = i["margen_actual"] if i["margen_actual"] is not None else i["margen_neto"]
                     rows.append(ft.DataRow(cells=[
                         ft.DataCell(ft.Text(i["nombre"])), ft.DataCell(ft.Text(money(i["costo_mp"]))),
-                        ft.DataCell(ft.Text(money(i["costo_total"]))), ft.DataCell(ft.Text(money(i["precio_recomendado"]))),
+                        ft.DataCell(ft.Text(money(i["costo_total"]))), ft.DataCell(ft.Text(money(i["precio_equilibrio"]))),
+                        ft.DataCell(ft.Text(money(i["precio_recomendado"]))),
                         ft.DataCell(ft.Text(f"{margin_value:.1f}%")),
                         ft.DataCell(ft.Container(ft.Text(i["estado"], color=ft.Colors.WHITE, size=12), bgcolor=color, padding=ft.Padding(8, 4, 8, 4), border_radius=12)),
                         ft.DataCell(valores_actuales[i["id"]]),
                     ]))
-                tabla = ft.Container(ft.Column([ft.Text("Detalle por producto", size=17, weight=ft.FontWeight.BOLD), simple_table(["Producto", "Costo MP", "Costo total", "Precio recomendado", "% Margen", "Estado", "Precio actual (opcional)"], rows), ft.FilledButton("Comparar precios actuales", icon=ft.Icons.REFRESH, on_click=actualizar)]), bgcolor=WHITE, padding=18, border_radius=12, shadow=soft_shadow())
+                tabla = ft.Container(ft.Column([ft.Text("Detalle por producto", size=17, weight=ft.FontWeight.BOLD), ft.Row([simple_table(["Producto", "Costo MP", "Costo total", "Punto equilibrio", "Precio recomendado", "% Margen", "Estado", "Precio actual (opcional)"], rows)], scroll=ft.ScrollMode.AUTO), ft.FilledButton("Comparar precios actuales", icon=ft.Icons.REFRESH, on_click=actualizar)]), bgcolor=WHITE, padding=18, border_radius=12, shadow=soft_shadow())
                 dashboard.controls = [cards, grafico_barras, grafico_estados, tabla]
 
             mostrar([actualizar_precio_actual(i, None) for i in analisis])
@@ -114,7 +130,12 @@ def recomendador_precios_view(page: ft.Page, db) -> ft.Control:
     margen.on_change = build
     build()
     return ft.Column([
-        page_heading("Estrategia de precios", "Revisá costos, márgenes y precios sugeridos para el catálogo de Los Tilos."),
+        ft.Row(
+            [
+                ft.Container(content=page_heading("Estrategia de precios", "Revisá costos, márgenes y precios sugeridos para el catálogo de Los Tilos."), expand=True),
+                ft.IconButton(ft.Icons.REFRESH_ROUNDED, tooltip="Actualizar costos y recetas", on_click=build, icon_color=PIZZA_RED),
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        ),
         ft.Container(ft.Column([margen_texto, margen, ft.Text("Precio sugerido = costo total × (1 + recargo). El margen neto se calcula sobre el precio de venta.")]), bgcolor=WHITE, padding=18, border_radius=12, shadow=soft_shadow()),
         estado_error, dashboard,
         ft.Text("Estimación de costos generales: los montos activos se distribuyen en partes iguales entre los productos activos porque el sistema no registra unidades producidas ni una base de asignación por producto. El período de cada costo también se conserva como referencia y no se normaliza.", size=11, color=ft.Colors.BLUE_GREY_600),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import math
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -17,11 +18,16 @@ class Database:
     def _connect(self):
         con = sqlite3.connect(self.path, timeout=10)
         con.row_factory = sqlite3.Row
-        con.execute("PRAGMA foreign_keys = ON")
 
         try:
+            con.execute("PRAGMA foreign_keys = ON")
             with con:
                 yield con
+        except BaseException:
+            # El context manager revierte la transacción; rollback explícito
+            # deja clara la garantía también ante errores de SQLite o Python.
+            con.rollback()
+            raise
         finally:
             con.close()
 
@@ -632,7 +638,12 @@ class Database:
         )
 
     def save_raw_material(self, v, raw_id=None):
-        if v["precio_compra"] <= 0 or v["cantidad_compra"] <= 0:
+        if (
+            not math.isfinite(float(v["precio_compra"]))
+            or not math.isfinite(float(v["cantidad_compra"]))
+            or v["precio_compra"] <= 0
+            or v["cantidad_compra"] <= 0
+        ):
             raise ValueError("El precio y la cantidad deben ser mayores a cero.")
         # Cambiar de peso a volumen (o a unidad) dejaría recetas existentes
         # con cantidades dimensionalmente incompatibles.
@@ -758,6 +769,10 @@ class Database:
         ingredients,
         product_id=None,
     ):
+        for ingredient in ingredients:
+            amount = float(ingredient["cantidad"])
+            if not math.isfinite(amount) or amount <= 0:
+                raise ValueError("Cada ingrediente debe tener una cantidad finita mayor a cero.")
         p = (
             v["nombre"],
             v["categoria"],
@@ -902,8 +917,7 @@ class Database:
             f"""
             SELECT *
             FROM costos_generales
-            WHERE nombre LIKE ?
-               OR categoria LIKE ?
+            WHERE (nombre LIKE ? OR categoria LIKE ?)
             {active_clause}
             ORDER BY activo DESC, nombre
             """,
@@ -914,10 +928,13 @@ class Database:
         )
 
     def save_general_cost(self, values, cost_id=None):
+        amount = float(values["monto"])
+        if not math.isfinite(amount) or amount <= 0:
+            raise ValueError("El monto debe ser un número finito mayor a cero.")
         params = (
             values["nombre"],
             values["categoria"],
-            values["monto"],
+            amount,
             values["periodo"],
             now(),
         )
