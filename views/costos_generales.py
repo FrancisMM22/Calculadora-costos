@@ -1,5 +1,6 @@
 import flet as ft
 
+from components.branding import WHITE, page_heading, soft_shadow
 from components.dialogs import close_dialog, confirm, show_dialog
 from components.tables import simple_table
 from utils.helpers import money, to_number
@@ -23,7 +24,7 @@ def costos_generales_view(page, db, refresh, open_new=False):
                 ft.Text(f"Costos activos: {len(active)}", weight=ft.FontWeight.BOLD),
                 ft.Text("Totales por período (no se combinan períodos diferentes):", color=ft.Colors.BLUE_GREY_700),
                 ft.Row(summaries, wrap=True) if summaries else ft.Text("Todavía no hay costos activos."),
-            ], spacing=8), bgcolor=ft.Colors.WHITE, padding=16, border_radius=10,
+            ], spacing=8), bgcolor=WHITE, padding=18, border_radius=12, shadow=soft_shadow(),
         )
         rows = []
         for item in costs:
@@ -103,7 +104,7 @@ def costos_generales_view(page, db, refresh, open_new=False):
         show_dialog(page, dialog)
 
     content = ft.Column([
-        ft.Row([ft.Column([ft.Text("Costos generales", size=28, weight=ft.FontWeight.BOLD), ft.Text("Registrá gastos del negocio sin asignarlos todavía a productos.")], expand=True), ft.FilledButton("Nuevo costo", icon=ft.Icons.ADD, on_click=lambda e: form())]),
+        ft.Row([page_heading("Costos generales", "Registrá los gastos del negocio y sus períodos de referencia."), ft.FilledButton("Nuevo costo", icon=ft.Icons.ADD, on_click=lambda e: form())], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER),
         search,
         host,
     ], expand=True, scroll=ft.ScrollMode.AUTO, spacing=14)

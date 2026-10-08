@@ -1,5 +1,6 @@
 import flet as ft
 
+from components.branding import page_heading
 from components.dialogs import close_dialog, confirm, show_dialog
 from components.tables import action_buttons, simple_table
 from utils.helpers import (
@@ -360,29 +361,16 @@ def materias_primas_view(page, db, refresh, open_new=False):
         [
             ft.Row(
                 [
-                    ft.Column(
-                        [
-                            ft.Text(
-                                "Materias primas",
-                                size=28,
-                                weight=ft.FontWeight.BOLD,
-                            ),
-
-                            ft.Text(
-                                "Administrá los ingredientes, "
-                                "materiales y productos que comprás "
-                                "para elaborar tus productos."
-                            ),
-                        ],
-                        expand=True,
-                    ),
+                    ft.Container(content=page_heading("Materias primas", "Administrá los ingredientes e insumos que comprás para elaborar tus productos."), expand=True),
 
                     ft.FilledButton(
                         "Nueva materia prima",
                         icon=ft.Icons.ADD,
                         on_click=lambda e: form(),
                     ),
-                ]
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
 
             search,

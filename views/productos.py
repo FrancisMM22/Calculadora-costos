@@ -1,5 +1,6 @@
 import flet as ft
 
+from components.branding import page_heading
 from components.dialogs import close_dialog, confirm, show_dialog
 from components.tables import action_buttons, simple_table
 from services.calculadora import ingredient_cost, product_cost
@@ -497,24 +498,15 @@ def productos_view(page, db, refresh, open_new=False):
         [
             ft.Row(
                 [
-                    ft.Column(
-                        [
-                            ft.Text(
-                                "Productos", size=28, weight=ft.FontWeight.BOLD
-                            ),
-                            ft.Text(
-                                "Creá recetas y consultá su costo"
-                                " actualizado."
-                            ),
-                        ],
-                        expand=True,
-                    ),
+                    ft.Container(content=page_heading("Productos / Recetas", "Creá recetas y consultá su costo actualizado."), expand=True),
                     ft.FilledButton(
                         "Nuevo producto",
                         icon=ft.Icons.ADD,
                         on_click=lambda e: form(),
                     ),
-                ]
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             search,
             host,
